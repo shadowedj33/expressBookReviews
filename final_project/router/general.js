@@ -1,21 +1,26 @@
 const express = require('express');
+const axios = require('axios');
 let books = require("./booksdb.js");
 let isValid = require("./auth_users.js").isValid;
 let users = require("./auth_users.js").users;
 const public_users = express.Router();
 
 
-public_users.post("/register", (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ message: "Username and password are required" });
+public_users.post("/register", (req,res) => {
+  //Write your code here
+  const username = req.body.username;
+  const password = req.body.password;
+
+  if (username && password) {
+    if (!isValid(username)) { 
+      users.push({"username":username,"password":password});
+      return res.status(200).json({message: "User successfully registred. You can login."});
+    } else {
+      return res.status(404).json({message: "User already exists!"});    
     }
-    if (users[username]) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
-    users[username] = password;
-    return res.status(201).json({ message: "User created successfully" });
-  });
+  } 
+  return res.status(404).json({message: "Unable to register user."});
+});
 
 // Get the book list available in the shop
 public_users.get('/', function (req, res) {
@@ -56,14 +61,100 @@ public_users.get('/title/:title', function (req, res) {
   });
 
 //  Get book review
-public_users.get('/review/:isbn', function (req, res) {
-    const isbn = parseInt(req.params.isbn);
-    const book = books[isbn];
-    if (book && book.reviews) {
-      return res.status(200).json(book.reviews);
-    } else {
-      return res.status(404).json({ message: "No reviews found for this book" });
-    }
-  });
+public_users.get('/review/:isbn',function (req, res) {
+  //Write your code here
+  const isbn = req.params.isbn;
+  const reviewsByIsbn = books[isbn].reviews;
+  res.send(reviewsByIsbn);
+});
+
+// Task 10 Promise or Async-Await list of books
+const getListOfBooks = async (url) => {
+    const outcome = await axios.get(url);
+    let listOfBooks = outcome.data;
+
+    console.log('----------------');
+    console.log('Get List Of Books');
+    console.log('----------------');
+    Object.values(listOfBooks).forEach((book) => {
+        console.log(`Author: ${book.author}`);
+        console.log(`Title: ${book.title}`);
+        console.log(`Reviews: ${JSON.stringify(book.reviews)}`);
+        console.log('----------------');
+    });
+    console.log('\n');
+}
+
+getListOfBooks(
+    'https://jdefoggia-5000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai/'
+).catch(err => console.log(err.toString()));
+
+// Task 11 Promis or Async-Await Book based on ISBN
+const getBookByISBN = async (url, isbn) => {
+    const outcome = await axios.get(url + isbn);
+    let book = outcome.data;
+    console.log('----------------');
+    console.log('Get Book By ISBN');
+    console.log('----------------');
+
+    console.log(`Author: ${book.author}`);
+    console.log(`Title: ${book.title}`);
+    console.log(`Reviews: ${JSON.stringify(book.reviews)}`);
+    console.log('----------------');
+    console.log('\n');
+}
+
+getBookByISBN(
+    'https://jdefoggia-5000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai/isbn/',
+    2
+).catch(err => console.log(err.toString()));
+
+// Task 12 Promis Asyn-Await Based on Author
+const getBookByAuthor = async (url, author) => {
+    const outcome = await axios.get(url + author);
+    let book = outcome.data.booksbyauthor;
+    console.log('----------------');
+    console.log('Get Book By Author');
+    console.log('----------------');
+
+    Object.values(book).forEach(item => {
+        console.log(`ISBN: ${item.isbn}`);
+        console.log(`Title: ${item.title}`);
+        console.log(`Reviews: ${JSON.stringify(item.reviews)}`);
+        console.log('----------------');
+    });
+
+    console.log('\n');
+}
+
+getBookByAuthor(
+    'https://jdefoggia-5000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai/author/',
+    'Jane Austen'
+).catch(err => console.log(err.toString()));
+
+
+// Task 13 Async-Await Book by Title
+
+const getBookByTitle = async (url, title) => {
+    const outcome = await axios.get(url + title);
+    let book = outcome.data.booksbytitle;
+    console.log('----------------');
+    console.log('Get Book By Title');
+    console.log('----------------');
+
+    book.forEach(item => {
+        console.log(`ISBN: ${item.isbn}`);
+        console.log(`Author: ${item.author}`);
+        console.log(`Reviews: ${JSON.stringify(item.reviews)}`);
+        console.log('----------------');
+    });
+
+    console.log('\n');
+}
+
+getBookByTitle(
+    'https://jdefoggia-5000.theianext-1-labs-prod-misc-tools-us-east-0.proxy.cognitiveclass.ai/title/',
+    'The Book of Job'
+).catch(err => console.log(err.toString()));
 
 module.exports.general = public_users;

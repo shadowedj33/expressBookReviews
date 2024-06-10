@@ -3,67 +3,93 @@ const jwt = require('jsonwebtoken');
 let books = require("./booksdb.js");
 const regd_users = express.Router();
 
-let users = [
-    {
-        "username": "test",
-        "password": "test2024"
-    }
-];
+let users = [];
 
 const isValid = (username)=>{ 
-  return users.some(user => user.username === username);
+    let userswithsamename = users.filter((user)=>{
+      return user.username === username
+    });
+    if(userswithsamename.length > 0){
+      return true;
+    } else {
+      return false;
+    }
 }
 
-const authenticatedUser = (username,password)=>{ 
-  return users.some(user => user.username === username && user.password === password);
+const authenticatedUser = (username,password)=>{
+  let validusers = users.filter((user)=>{
+    return (user.username === username && user.password === password)
+  });
+  if(validusers.length > 0){
+    return true;
+  } else {
+    return false;
+  }
 }
 
 //only registered users can login
 regd_users.post("/login", (req,res) => {
-  const { username, password } = req.body;
-  if (!username ||!password) {
-    return res.status(400).json({ message: "Username and password are required" });
+  const username = req.body.username;
+  const password = req.body.password;
+
+  if (!username || !password) {
+      return res.status(404).json({message: "Error logging in"});
   }
-  if (!authenticatedUser(username, password)) {
-    return res.status(401).json({ message: "Invalid username or password" });
+
+  if (authenticatedUser(username,password)) {
+    let accessToken = jwt.sign({
+      data: password
+    }, 'access', { expiresIn: 60 * 60 });
+
+    req.session.authorization = {
+      accessToken,username
   }
-  const token = jwt.sign({ username }, 'secretkey', { expiresIn: '1h' });
-  return res.status(200).json({ message: "User successfully logged in." });
+  return res.status(200).send("Customer successfully logged in");
+  } else {
+    return res.status(208).json({message: "Invalid Login. Check username and password"});
+  }
 });
 
 // Add a book review
-regd_users.put("/auth/review/:isbn", verifyToken, (req, res) => {
+regd_users.put("/auth/review/:isbn", (req, res) => {
+  //Write your code here
   const isbn = req.params.isbn;
-  const review = req.body.review;
-  const username = req.username;
+    let book = books[isbn]
+    if (book) { //Check book exists
+        let review = req.query.review;
 
-  // Check if the user has already posted a review for this ISBN
-  const existingReview = books.find((book) => book.isbn === isbn && book.reviews.find((review) => review.username === username));
-
-  if (existingReview) {
-    // Modify the existing review
-    const index = existingReview.reviews.findIndex((review) => review.username === username);
-    existingReview.reviews[index].review = review;
-    res.status(200).json({ message: "Review updated successfully" });
-  } else {
-    // Add a new review
-    const newReview = { username, review };
-    books.find((book) => book.isbn === isbn).reviews.push(newReview);
-    res.status(201).json({ message: "Review added successfully" });
-  }
+        //if review the reviews has been changed, update the reviews 
+        if (review) {
+            book["reviews"] = review
+            console.log("Hepp---", book["reviews"])
+        }
+        
+        books[isbn] = book;
+        res.send(`Review for the book with IBN ${isbn} was added/updated. \n ${JSON.stringify(books[isbn])}`);
+    }
+    else {
+        res.send("Unable to find book with IBN!");
+    }
 });
 
-// Verify token middleware
-function verifyToken(req, res, next) {
-  const token = req.header("Authorization").replace("Bearer ", "");
-  jwt.verify(token, "secretkey", (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
-    req.username = decoded.username;
-    next();
-  });
-}
+// Remove book review
+regd_users.delete("/auth/review/:isbn", (req, res) => {
+  const isbn = req.params.isbn;
+  let book = books[isbn];
+  if (book) {
+    //Check book exists
+    delete book["reviews"];
+    book["reviews"] = {};
+    books[isbn] = book;
+    res.send(
+      `Review for the book with ISBN ${isbn} posted by ${JSON.stringify(
+        req.session.authorization.username
+      )} has been Deleted. \n ${JSON.stringify(books[isbn])}`
+    );
+  } else {
+    res.send("Unable to find book with ISBN!");
+  }
+});
 
 module.exports.authenticated = regd_users;
 module.exports.isValid = isValid;
